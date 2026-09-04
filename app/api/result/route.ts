@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { findStudentResult, saveStudentResult } from "@/lib/supabase";
+import { parseTeletalkHtml } from "@/lib/teletalk-formatter";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      exam,
-      year,
+      exam = "ssc",
+      year = "2024",
       board,
       roll,
-      reg,
+      reg = "",
       value_a,
       value_b,
       value_s,
@@ -34,21 +36,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Build form-urlencoded payload for Teletalk server
+    const cleanRoll = roll.trim();
+    const cleanYear = String(year).trim();
+    const cleanBoard = String(board).toLowerCase().trim();
+    const cleanExam = String(exam).toLowerCase().trim();
+    const cleanReg = String(reg).trim();
+
+    // 1. STEP ONE: Check Database first (Supabase)
+    const existingResult = await findStudentResult(
+      cleanExam,
+      cleanYear,
+      cleanBoard,
+      cleanRoll
+    );
+
+    if (existingResult && existingResult.raw_html) {
+      return NextResponse.json({
+        success: true,
+        html: existingResult.raw_html,
+        source: "database",
+        student: existingResult,
+      });
+    }
+
+    // 2. STEP TWO: If not in database, query Teletalk server
     const params = new URLSearchParams();
     params.append("sr", "1");
     params.append("et", "2");
-    params.append("exam", exam || "ssc");
-    params.append("year", year || "2024");
-    params.append("board", board);
-    params.append("roll", roll.trim());
-    params.append("reg", (reg || "").trim());
+    params.append("exam", cleanExam);
+    params.append("year", cleanYear);
+    params.append("board", cleanBoard);
+    params.append("roll", cleanRoll);
+    params.append("reg", cleanReg);
     params.append("value_a", String(value_a));
     params.append("value_b", String(value_b));
     params.append("value_s", String(value_s));
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     const upstreamRes = await fetch(
       "http://oldweb.teletalk.com.bd/result.php",
@@ -77,17 +102,41 @@ export async function POST(req: NextRequest) {
     }
 
     let rawHtml = await upstreamRes.text();
-
-    // Clean up any PHP error output notice at top like 'Error occured.'
     rawHtml = rawHtml.replace(/^Error occured\./i, "").trim();
+
+    // 3. STEP THREE: If a real result was found from Teletalk, automatically save it to Supabase!
+    const isFound =
+      !rawHtml.includes("RESULT NOT FOUND!") &&
+      !rawHtml.includes("RESULT IS NOT PUBLISHED YET!") &&
+      !rawHtml.includes("Entered value does not match!");
+
+    if (isFound) {
+      try {
+        const parsed = parseTeletalkHtml(rawHtml, {
+          exam: cleanExam,
+          year: cleanYear,
+          board: cleanBoard,
+          roll: cleanRoll,
+          reg: cleanReg,
+        });
+
+        if (parsed) {
+          await saveStudentResult(parsed);
+        }
+      } catch (saveErr) {
+        console.warn("Failed to auto-save result to database:", saveErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       html: rawHtml,
+      source: "teletalk",
+      savedToDb: isFound,
     });
   } catch (err: unknown) {
     const errorMsg =
-      err instanceof Error ? err.message : "Failed to connect to Teletalk server";
+      err instanceof Error ? err.message : "Failed to connect to result server";
     return NextResponse.json(
       { success: false, error: errorMsg },
       { status: 500 }

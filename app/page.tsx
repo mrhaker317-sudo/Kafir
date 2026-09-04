@@ -2,7 +2,8 @@
 
 import React, { useState, useRef } from "react";
 import Image from "next/image";
-import { Printer, RotateCw, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { Printer, RotateCw, AlertCircle, Database, Globe } from "lucide-react";
 
 export default function Home() {
   const [exam, setExam] = useState("ssc");
@@ -20,6 +21,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rawHtml, setRawHtml] = useState<string | null>(null);
+  const [resultSource, setResultSource] = useState<"database" | "teletalk" | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -37,12 +39,14 @@ export default function Home() {
     setReg("");
     setError(null);
     setRawHtml(null);
+    setResultSource(null);
     generateCaptcha();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setResultSource(null);
 
     // Validation
     if (board === "-1") {
@@ -67,6 +71,7 @@ export default function Home() {
 
     setLoading(true);
     setRawHtml(null);
+    setResultSource(null);
 
     try {
       const res = await fetch("/api/result", {
@@ -88,6 +93,7 @@ export default function Home() {
 
       if (data.success && data.html) {
         setRawHtml(data.html);
+        setResultSource(data.source || null);
         generateCaptcha();
         setTimeout(() => {
           contentRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -469,7 +475,23 @@ export default function Home() {
                                   </div>
                                 )}
 
-                                {/* Authentic HTML Response directly from Teletalk result.php */}
+                                {/* Authentic HTML Response directly from Teletalk or Database */}
+                                {hasValidResult && resultSource && (
+                                  <div className="pt-2 no-print">
+                                    {resultSource === "database" ? (
+                                      <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 py-1 px-3 rounded-full border border-emerald-200 w-fit mx-auto shadow-sm">
+                                        <Database className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Verified from Saved Database</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-center gap-1.5 text-[11px] text-blue-800 bg-blue-50 py-1 px-3 rounded-full border border-blue-200 w-fit mx-auto shadow-sm">
+                                        <Globe className="w-3.5 h-3.5 text-blue-600" />
+                                        <span>Retrieved from Teletalk & Saved to Database</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
                                 {rawHtml && (
                                   <div 
                                     className="my-3 text-[12px] text-center" 
@@ -518,6 +540,10 @@ export default function Home() {
                                     <td className="w-[5px] text-left align-bottom bg-[#F2F2F2] font-[Verdana,Arial,Helvetica,sans-serif] text-[10px] text-[#666666] leading-[15px]"></td>
                                     <td className="w-[356px] h-[70px] text-left align-middle bg-[#F2F2F2] font-[Verdana,Arial,Helvetica,sans-serif] text-[10px] text-[#666666] leading-[15px] pl-1">
                                       &copy;2005-2026 Ministry of Education, All rights reserved.
+                                      <span className="mx-1">|</span>
+                                      <Link href="/admin" className="text-[#007814] hover:underline font-semibold no-print">
+                                        Admin Panel
+                                      </Link>
                                     </td>
                                     <td className="w-[150px] h-[70px] text-right align-middle bg-[#F2F2F2] font-[Verdana,Arial,Helvetica,sans-serif] text-[10px] text-[#666666] leading-[15px] pr-2">
                                       Powered by
