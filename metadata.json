@@ -1,0 +1,6 @@
+{
+  "name": "Education Board Bangladesh",
+  "description": "Intermediate and Secondary Education Boards Bangladesh Results",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
