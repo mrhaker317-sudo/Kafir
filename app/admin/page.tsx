@@ -124,6 +124,7 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [showSqlGuide, setShowSqlGuide] = useState(false);
+  const [showConfigGuide, setShowConfigGuide] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState<Partial<StudentResult>>({
@@ -363,6 +364,12 @@ export default function AdminPage() {
                   {configured ? "Supabase Connected" : "Local Sync / In-Memory"}
                 </span>
               </div>
+              <button
+                onClick={() => setShowConfigGuide(!showConfigGuide)}
+                className="mt-1.5 text-[11px] font-semibold text-[#007814] hover:underline cursor-pointer block"
+              >
+                {showConfigGuide ? "Hide File Config" : "Render / File Config Guide"}
+              </button>
             </div>
             <div>
               {configured ? (
@@ -408,6 +415,43 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        {/* File Config Guide Panel */}
+        {showConfigGuide && (
+          <div className="mb-6 bg-emerald-950 text-emerald-100 p-4 rounded-lg shadow border border-emerald-800">
+            <div className="flex items-center justify-between pb-2 border-b border-emerald-800 mb-2">
+              <span className="text-xs font-bold text-emerald-300 uppercase tracking-wide">
+                Render এ কোনো Environment Variable ছাড়া সরাসরি ফাইলে কী (Keys) বসানোর নিয়ম
+              </span>
+              <button
+                onClick={() => setShowConfigGuide(false)}
+                className="text-xs text-emerald-400 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            <div className="text-xs text-emerald-200 space-y-2">
+              <p>
+                Render-এ বারবার environment variable অ্যাড না করে সরাসরি নিচের যেকোনো একটি ফাইলে আপনার Supabase URL ও Key পেস্ট করে দিতে পারেন:
+              </p>
+              <div className="bg-black/40 p-2.5 rounded font-mono text-[11px] text-emerald-300">
+                <p className="font-bold text-white mb-1">Option 1 (সর্বাধিক নির্ভরযোগ্য): <span className="text-yellow-300">lib/config.ts</span> ফাইলে সরাসরি বসান:</p>
+                <pre>{`export const APP_CONFIG = {
+  SUPABASE_URL: "https://your-project.supabase.co",
+  SUPABASE_ANON_KEY: "your-anon-key-here",
+};`}</pre>
+              </div>
+              <div className="bg-black/40 p-2.5 rounded font-mono text-[11px] text-emerald-300">
+                <p className="font-bold text-white mb-1">Option 2: প্রজেক্টের রুট ডিরেক্টরির <span className="text-yellow-300">.env</span> ফাইলে বসান:</p>
+                <pre>{`NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here`}</pre>
+              </div>
+              <p className="text-[11px] text-emerald-300">
+                আমরা <code className="bg-black/30 px-1 py-0.5 rounded">.gitignore</code> ফাইলে <code className="bg-black/30 px-1 py-0.5 rounded">.env</code> ফাইলটিকে অনুমোদন দিয়েছি, ফলে GitHub বা Render ডিপ্লয়মেন্টে এই ফাইলটি স্বয়ংক্রিয়ভাবে আপলোড হবে এবং কাজ করবে।
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Supabase Schema Code Panel */}
         {showSqlGuide && (

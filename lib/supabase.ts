@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { StudentResult } from "./types";
 import { generateTeletalkHtml } from "./teletalk-formatter";
+import { APP_CONFIG } from "./config";
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -44,15 +45,21 @@ memoryStore.set("ssc-2024-dhaka-123456", {
 export function getSupabase(): SupabaseClient | null {
   if (supabaseClient) return supabaseClient;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    APP_CONFIG.SUPABASE_URL;
+
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    APP_CONFIG.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_ANON_KEY;
+    process.env.SUPABASE_ANON_KEY ||
+    APP_CONFIG.SUPABASE_ANON_KEY;
 
   if (url && key && url.trim() !== "" && key.trim() !== "") {
     try {
-      supabaseClient = createClient(url, key, {
+      supabaseClient = createClient(url.trim(), key.trim(), {
         auth: { persistSession: false },
       });
       return supabaseClient;
@@ -66,11 +73,18 @@ export function getSupabase(): SupabaseClient | null {
 }
 
 export function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    APP_CONFIG.SUPABASE_URL;
+
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    APP_CONFIG.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_ANON_KEY;
+    process.env.SUPABASE_ANON_KEY ||
+    APP_CONFIG.SUPABASE_ANON_KEY;
+
   return Boolean(url && key && url.trim() !== "" && key.trim() !== "");
 }
 
