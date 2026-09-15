@@ -17,7 +17,15 @@ import {
   Check,
   GraduationCap,
   X,
-  FileText
+  FileText,
+  Lock,
+  Unlock,
+  Key,
+  LogOut,
+  Shield,
+  EyeOff,
+  User,
+  CheckCircle
 } from "lucide-react";
 import { StudentResult, SubjectGrade } from "@/lib/types";
 
@@ -109,12 +117,49 @@ create policy "Public insert" on student_results for insert with check (true);
 create policy "Public update" on student_results for update using (true);
 create policy "Public delete" on student_results for delete using (true);`;
 
+const DEFAULT_CREDS = { username: "dude", password: "41" };
+
+function getStoredCredentials() {
+  if (typeof window === "undefined") return DEFAULT_CREDS;
+  try {
+    const raw = localStorage.getItem("eb_admin_credentials");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.username === "string" && typeof parsed.password === "string") {
+        return { username: parsed.username, password: parsed.password };
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return DEFAULT_CREDS;
+}
+
 export default function AdminPage() {
   const [results, setResults] = useState<StudentResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBoard, setFilterBoard] = useState("all");
+
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Change Credentials Modal State
+  const [isCredsModalOpen, setIsCredsModalOpen] = useState(false);
+  const [currentCredsPass, setCurrentCredsPass] = useState("");
+  const [newCredsUser, setNewCredsUser] = useState("");
+  const [newCredsPass, setNewCredsPass] = useState("");
+  const [confirmNewCredsPass, setConfirmNewCredsPass] = useState("");
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [credsModalError, setCredsModalError] = useState("");
+  const [credsModalSuccess, setCredsModalSuccess] = useState("");
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -183,6 +228,138 @@ export default function AdminPage() {
       ignore = true;
     };
   }, []);
+
+  // Check auth session from sessionStorage
+  useEffect(() => {
+    let ignore = false;
+    async function checkAuth() {
+      if (typeof window !== "undefined") {
+        const authSession = sessionStorage.getItem("eb_admin_auth_session");
+        if (!ignore) {
+          setIsAuthenticated(authSession === "true");
+        }
+      }
+    }
+    checkAuth();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoginLoading(true);
+
+    setTimeout(() => {
+      const creds = getStoredCredentials();
+      if (
+        loginUsername.trim() === creds.username &&
+        loginPassword.trim() === creds.password
+      ) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("eb_admin_auth_session", "true");
+        }
+        setIsAuthenticated(true);
+        setLoginPassword("");
+        setLoginError("");
+      } else {
+        setLoginError("ভুল ইউজারনেম অথবা পাসওয়ার্ড! আবার চেষ্টা করুন। (Invalid username or password)");
+      }
+      setLoginLoading(false);
+    }, 250);
+  };
+
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("eb_admin_auth_session");
+    }
+    setIsAuthenticated(false);
+    setLoginUsername("");
+    setLoginPassword("");
+    setLoginError("");
+  };
+
+  const handleOpenCredsModal = () => {
+    const creds = getStoredCredentials();
+    setCurrentCredsPass("");
+    setNewCredsUser(creds.username);
+    setNewCredsPass("");
+    setConfirmNewCredsPass("");
+    setShowCurrentPass(false);
+    setShowNewPass(false);
+    setCredsModalError("");
+    setCredsModalSuccess("");
+    setIsCredsModalOpen(true);
+  };
+
+  const handleSaveCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCredsModalError("");
+    setCredsModalSuccess("");
+
+    const creds = getStoredCredentials();
+
+    if (currentCredsPass.trim() !== creds.password) {
+      setCredsModalError("বর্তমান পাসওয়ার্ডটি সঠিক নয়!");
+      return;
+    }
+
+    if (!newCredsUser.trim()) {
+      setCredsModalError("নতুন ইউজারনেম খালি রাখা যাবে না!");
+      return;
+    }
+
+    if (!newCredsPass.trim()) {
+      setCredsModalError("নতুন পাসওয়ার্ড খালি রাখা যাবে না!");
+      return;
+    }
+
+    if (newCredsPass !== confirmNewCredsPass) {
+      setCredsModalError("নতুন পাসওয়ার্ড এবং কনফার্ম পাসওয়ার্ড মিলছে না!");
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        "eb_admin_credentials",
+        JSON.stringify({
+          username: newCredsUser.trim(),
+          password: newCredsPass.trim(),
+        })
+      );
+      setCredsModalSuccess("ইউজারনেম ও পাসওয়ার্ড সফলভাবে আপডেট করা হয়েছে!");
+      setTimeout(() => {
+        setIsCredsModalOpen(false);
+        setCredsModalSuccess("");
+      }, 1500);
+    } catch {
+      setCredsModalError("ডাটা সংরক্ষণে সমস্যা হয়েছে, অনুগ্রহ করে আবার চেষ্টা করুন।");
+    }
+  };
+
+  const handleResetDefaultCreds = () => {
+    if (
+      window.confirm(
+        "আপনি কি নিশ্চিত যে ইউজারনেম ও পাসওয়ার্ড ডিফল্ট মানে (username: dude, password: 41) রিসেট করতে চান?"
+      )
+    ) {
+      try {
+        localStorage.setItem("eb_admin_credentials", JSON.stringify(DEFAULT_CREDS));
+        setNewCredsUser(DEFAULT_CREDS.username);
+        setCurrentCredsPass("");
+        setNewCredsPass("");
+        setConfirmNewCredsPass("");
+        setCredsModalSuccess("ডিফল্ট মানে (dude / 41) সফলভাবে রিসেট করা হয়েছে!");
+        setTimeout(() => {
+          setIsCredsModalOpen(false);
+          setCredsModalSuccess("");
+        }, 1500);
+      } catch {
+        setCredsModalError("রিসেট করতে ব্যর্থ হয়েছে।");
+      }
+    }
+  };
 
   const handleOpenAdd = () => {
     setFormData({
@@ -313,6 +490,137 @@ export default function AdminPage() {
     return matchesSearch && matchesBoard;
   });
 
+  // 1. Initial Session Check State
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center font-sans">
+        <div className="text-center p-6 bg-white rounded-lg border border-gray-200 shadow-sm max-w-sm w-full mx-4">
+          <RotateCw className="w-8 h-8 text-[#007814] animate-spin mx-auto mb-3" />
+          <p className="text-sm font-semibold text-gray-700">Checking authorization...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Login Gate Screen (When not logged in)
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-200 flex flex-col justify-center items-center p-4 font-sans text-gray-800">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          {/* Card Top Banner */}
+          <div className="bg-[#007814] px-6 py-5 text-white text-center relative">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/15 mb-2.5">
+              <Lock className="w-6 h-6 text-yellow-300" />
+            </div>
+            <h2 className="text-lg font-bold tracking-tight">Education Board Bangladesh</h2>
+            <p className="text-xs text-emerald-100 mt-0.5">Admin Security Verification</p>
+          </div>
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="p-6 space-y-4">
+            {loginError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-xs text-red-700">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
+                Username (ইউজারনেম)
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter username"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007814] focus:border-transparent transition"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
+                Password (পাসওয়ার্ড)
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <input
+                  type={showLoginPassword ? "text" : "password"}
+                  required
+                  placeholder="Enter password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full pl-9 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007814] focus:border-transparent transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-2.5 px-4 bg-[#007814] hover:bg-[#006010] text-white font-bold text-sm rounded-lg shadow transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            >
+              {loginLoading ? (
+                <>
+                  <RotateCw className="w-4 h-4 animate-spin" /> Verifying...
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 text-yellow-300" /> Log In to Admin Panel
+                </>
+              )}
+            </button>
+
+            {/* Default credential helper banner */}
+            <div className="pt-2 border-t border-gray-100">
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-2.5 text-[11px] text-emerald-900">
+                <div className="flex items-center gap-1.5 font-bold mb-0.5 text-emerald-800">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Default Login Credentials</span>
+                </div>
+                <p className="text-gray-700">
+                  Username: <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">dude</code>
+                  <span className="mx-1.5">|</span>
+                  Password: <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">41</code>
+                </p>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  (অ্যাডমিন প্যানেলে লগইন করার পর যেকোনো সময় ইউজারনেম ও পাসওয়ার্ড পরিবর্তন করা যাবে)
+                </p>
+              </div>
+            </div>
+
+            <div className="text-center pt-2">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-[#007814] transition font-medium"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                মূল সার্চ পেজে ফিরে যান (Return to Search)
+              </Link>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Authenticated Admin Panel
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
       {/* Top Header */}
@@ -336,7 +644,17 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleOpenCredsModal}
+              id="btnChangeCreds"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded shadow-sm transition cursor-pointer border border-white/20"
+              title="ইউজারনেম ও পাসওয়ার্ড পরিবর্তন করুন"
+            >
+              <Key className="w-3.5 h-3.5 text-yellow-300" />
+              <span>Change Password</span>
+            </button>
+
             <button
               onClick={handleOpenAdd}
               id="btnAddStudent"
@@ -344,6 +662,16 @@ export default function AdminPage() {
             >
               <Plus className="w-4 h-4" />
               Add Student Result
+            </button>
+
+            <button
+              onClick={handleLogout}
+              id="btnLogout"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded shadow-sm transition cursor-pointer"
+              title="লগআউট করুন"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
@@ -987,6 +1315,144 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here`}</pre>
                 Close Preview
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Credentials Modal */}
+      {isCredsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-gray-200">
+            <div className="bg-[#007814] text-white px-5 py-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-yellow-300" />
+                <h2 className="text-sm font-bold tracking-tight">Admin Credentials Settings</h2>
+              </div>
+              <button
+                onClick={() => setIsCredsModalOpen(false)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCredentials} className="p-5 space-y-4">
+              {credsModalError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-xs text-red-700">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{credsModalError}</span>
+                </div>
+              )}
+
+              {credsModalSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-2 text-xs text-emerald-800 font-semibold">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{credsModalSuccess}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Current Password (বর্তমান পাসওয়ার্ড) *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPass ? "text" : "password"}
+                    required
+                    placeholder="বর্তমান পাসওয়ার্ড দিন"
+                    value={currentCredsPass}
+                    onChange={(e) => setCurrentCredsPass(e.target.value)}
+                    className="w-full p-2 pr-9 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#007814]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPass(!showCurrentPass)}
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showCurrentPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-gray-200">
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  New Username (নতুন ইউজারনেম) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="যেমন: admin বা আপনার নাম"
+                  value={newCredsUser}
+                  onChange={(e) => setNewCredsUser(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#007814]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  New Password (নতুন পাসওয়ার্ড) *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPass ? "text" : "password"}
+                    required
+                    placeholder="নতুন পাসওয়ার্ড দিন"
+                    value={newCredsPass}
+                    onChange={(e) => setNewCredsPass(e.target.value)}
+                    className="w-full p-2 pr-9 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#007814]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPass(!showNewPass)}
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showNewPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Confirm New Password (নতুন পাসওয়ার্ড নিশ্চিত করুন) *
+                </label>
+                <input
+                  type={showNewPass ? "text" : "password"}
+                  required
+                  placeholder="পুনরায় নতুন পাসওয়ার্ডটি লিখুন"
+                  value={confirmNewCredsPass}
+                  onChange={(e) => setConfirmNewCredsPass(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#007814]"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-gray-200 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetDefaultCreds}
+                  className="text-[11px] text-gray-500 hover:text-red-600 underline cursor-pointer"
+                  title="রিসেট করে dude/41 এ ফিরিয়ে আনুন"
+                >
+                  Reset to Default (dude / 41)
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCredsModalOpen(false)}
+                    className="px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-semibold rounded hover:bg-gray-50 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-[#007814] hover:bg-[#006010] text-white text-xs font-bold rounded shadow transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

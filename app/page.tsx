@@ -2,7 +2,6 @@
 
 import React, { useState, useRef } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { Printer, RotateCw, AlertCircle, Database, Globe } from "lucide-react";
 
 export default function Home() {
@@ -540,10 +539,6 @@ export default function Home() {
                                     <td className="w-[5px] text-left align-bottom bg-[#F2F2F2] font-[Verdana,Arial,Helvetica,sans-serif] text-[10px] text-[#666666] leading-[15px]"></td>
                                     <td className="w-[356px] h-[70px] text-left align-middle bg-[#F2F2F2] font-[Verdana,Arial,Helvetica,sans-serif] text-[10px] text-[#666666] leading-[15px] pl-1">
                                       &copy;2005-2026 Ministry of Education, All rights reserved.
-                                      <span className="mx-1">|</span>
-                                      <Link href="/admin" className="text-[#007814] hover:underline font-semibold no-print">
-                                        Admin Panel
-                                      </Link>
                                     </td>
                                     <td className="w-[150px] h-[70px] text-right align-middle bg-[#F2F2F2] font-[Verdana,Arial,Helvetica,sans-serif] text-[10px] text-[#666666] leading-[15px] pr-2">
                                       Powered by
